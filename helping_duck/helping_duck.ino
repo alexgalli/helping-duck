@@ -8,11 +8,12 @@
 #include <Wire.h>
 
 void mpu_setup();
-void mpu_calibrate();
 void mpu_execute();
 int16_t mpu_readint();
 double mpu_temp();
 void mpu_print(bool raw);
+void mpu_calibrate();
+bool mpu_detect();
 
 #endif
 
@@ -59,11 +60,13 @@ void setup() {
 
 void loop() {
     mpu_execute();
-    mpu_print(false);
-    Serial.println();
 
-    delay(30000);
-    quack();
+    if(mpu_detect()) {
+        quack();
+        delay(5000);
+    } else {
+        delay(100);
+    }
 }
 
 
@@ -83,13 +86,16 @@ void loop() {
 #define NUM_REGISTERS 14
 
 // maximum difference we'll accept total acceleration in order to pass a calibration check
-#define CHECK_ACCEL_MAX 300
+#define CHECK_ACCEL_MAX 400
 
 // number of consecutive checks we must pass to be calibrated
 #define CHECK_ACCEL_COUNT 5
 
 // delay between accel checks
 #define CHECK_ACCEL_DELAY 500
+
+// threshold to trigger a desk bump
+#define BUMP_THRESHOLD 4000
 
 int16_t init_acX,init_acY,init_acZ,init_tmp,init_gyX,init_gyY,init_gyZ;
 int16_t prev_acX,prev_acY,prev_acZ,prev_tmp,prev_gyX,prev_gyY,prev_gyZ;
@@ -107,43 +113,6 @@ void mpu_setup() {
     mpu_execute();
 
     log2("mpu", "setup complete");
-}
-
-void mpu_calibrate() {
-    int total_diff;
-    int consecutive_checks = 0;
-    bool pass = false;
-    char buffer[100];
-    
-    log2("mpu", "starting calibration");
-    
-    do {
-        mpu_execute();
-        
-        total_diff = abs(diff_acX) + abs(diff_acY) + abs(diff_acZ);
-        pass = total_diff < CHECK_ACCEL_MAX;
-        if (pass)
-            consecutive_checks++;
-        else
-            consecutive_checks = 0;
-            
-        sprintf(buffer, "calibration (%d,\t%d,\t%d)\ttotal (%d)\tpass (%d)\tchecks (%d)", diff_acX, diff_acY, diff_acZ, total_diff, pass, consecutive_checks);
-        delay(CHECK_ACCEL_DELAY);
-        log2("mpu", buffer);
-        
-    } while (consecutive_checks < CHECK_ACCEL_COUNT);
-
-    // set initial values
-    init_acX = acX;
-    init_acY = acY;
-    init_acZ = acZ;
-    init_gyX = gyX;
-    init_gyY = gyY;
-    init_gyZ = gyZ;
-    init_tmp = tmp;
-
-    quack();
-    log2("mpu", "calibrated!");
 }
 
 void mpu_execute() {
@@ -202,6 +171,57 @@ void mpu_print(bool raw) {
     Serial.println(buffer);
 }
 
+void mpu_calibrate() {
+    int total_diff;
+    int consecutive_checks = 0;
+    bool pass = false;
+    char buffer[100];
+
+    log2("mpu", "starting calibration");
+
+    do {
+        mpu_execute();
+
+        total_diff = abs(diff_acX) + abs(diff_acY) + abs(diff_acZ);
+        pass = total_diff < CHECK_ACCEL_MAX;
+
+        if (pass)
+            consecutive_checks++;
+        else
+            consecutive_checks = 0;
+
+        sprintf(buffer, "calibration (%d,\t%d,\t%d)\ttotal (%d)\tpass (%d)\tchecks (%d)", diff_acX, diff_acY, diff_acZ, total_diff, pass, consecutive_checks);
+        delay(CHECK_ACCEL_DELAY);
+        log2("mpu", buffer);
+    } while (consecutive_checks < CHECK_ACCEL_COUNT);
+
+    // set initial values
+    init_acX = acX;
+    init_acY = acY;
+    init_acZ = acZ;
+    init_gyX = gyX;
+    init_gyY = gyY;
+    init_gyZ = gyZ;
+    init_tmp = tmp;
+
+    quack();
+    log2("mpu", "calibrated!");
+}
+
+bool mpu_detect() {
+    int total_diff;
+    char buffer[50];
+
+    total_diff = abs(diff_acX) + abs(diff_acY) + abs(diff_acZ);
+
+    if (total_diff >= CHECK_ACCEL_MAX) {
+        sprintf(buffer, "total_diff %d", total_diff);
+        log2("mpu", buffer);
+    }
+
+    return total_diff >= BUMP_THRESHOLD;
+}
+
 /*
  * quack.c
  */
@@ -214,6 +234,7 @@ const unsigned char sample[] PROGMEM = {
 };
 
 void quack() {
+  log("quack!");
   startPlayback(sample, sizeof(sample));
   delay(1000);
 }
