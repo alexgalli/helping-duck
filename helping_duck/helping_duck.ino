@@ -13,7 +13,7 @@ int16_t mpu_readint();
 double mpu_temp();
 void mpu_print(bool raw);
 void mpu_calibrate();
-bool mpu_detect();
+bool mpu_detect(unsigned int quack_threshold);
 
 #endif
 
@@ -48,9 +48,20 @@ void quack();
 
 #include <Arduino.h>
 
+// threshold to trigger a desk bump
+#define QUACK_THRESHOLD 6000
+
+// for testing set to 1
+#define AUTO_QUACK 1
+
 void setup() {
     Serial.begin(9600);
     log2("init", "serial started");
+
+    while (AUTO_QUACK == 1) {
+        quack();
+        delay(800);
+    }
 
     log2("mpu", "setting up..");
     mpu_setup();
@@ -61,9 +72,12 @@ void setup() {
 void loop() {
     mpu_execute();
 
-    if(mpu_detect()) {
+    if(mpu_detect(QUACK_THRESHOLD)) {
         quack();
-        delay(5000);
+        delay(3000);
+        mpu_execute();
+        mpu_execute();
+        mpu_execute();
     } else {
         delay(100);
     }
@@ -93,9 +107,6 @@ void loop() {
 
 // delay between accel checks
 #define CHECK_ACCEL_DELAY 500
-
-// threshold to trigger a desk bump
-#define BUMP_THRESHOLD 4000
 
 int16_t init_acX,init_acY,init_acZ,init_tmp,init_gyX,init_gyY,init_gyZ;
 int16_t prev_acX,prev_acY,prev_acZ,prev_tmp,prev_gyX,prev_gyY,prev_gyZ;
@@ -176,20 +187,20 @@ void mpu_calibrate() {
     int consecutive_checks = 0;
     bool pass = false;
     char buffer[100];
-
+    
     log2("mpu", "starting calibration");
-
+    
     do {
         mpu_execute();
-
+        
         total_diff = abs(diff_acX) + abs(diff_acY) + abs(diff_acZ);
         pass = total_diff < CHECK_ACCEL_MAX;
-
+        
         if (pass)
             consecutive_checks++;
         else
             consecutive_checks = 0;
-
+            
         sprintf(buffer, "calibration (%d,\t%d,\t%d)\ttotal (%d)\tpass (%d)\tchecks (%d)", diff_acX, diff_acY, diff_acZ, total_diff, pass, consecutive_checks);
         delay(CHECK_ACCEL_DELAY);
         log2("mpu", buffer);
@@ -208,10 +219,10 @@ void mpu_calibrate() {
     log2("mpu", "calibrated!");
 }
 
-bool mpu_detect() {
+bool mpu_detect(unsigned int quack_threshold) {
     int total_diff;
     char buffer[50];
-
+    
     total_diff = abs(diff_acX) + abs(diff_acY) + abs(diff_acZ);
 
     if (total_diff >= CHECK_ACCEL_MAX) {
@@ -219,7 +230,7 @@ bool mpu_detect() {
         log2("mpu", buffer);
     }
 
-    return total_diff >= BUMP_THRESHOLD;
+    return total_diff >= quack_threshold;
 }
 
 /*
