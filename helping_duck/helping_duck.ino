@@ -1,6 +1,6 @@
 /*
- * mpu.h
- */
+   mpu.h
+*/
 
 #ifndef _MPU
 #define _MPU
@@ -19,8 +19,8 @@ bool mpu_detect(unsigned int quack_threshold);
 
 
 /*
- * logger.h
- */
+   logger.h
+*/
 
 #ifndef _LOGGER
 #define _LOGGER
@@ -32,18 +32,19 @@ void log2(const char *category, const char* message);
 
 
 /*
- * quack.h
- */
+   quack.h
+*/
 
 #ifndef _QUACK
 #define _QUACK
 
+void setup_quack();
 void quack();
 
 #endif
 
 /**********
- * main.c *
+   main.c
  **********/
 
 #include <Arduino.h>
@@ -52,42 +53,44 @@ void quack();
 #define QUACK_THRESHOLD 6000
 
 // for testing set to 1
-#define AUTO_QUACK 1
+#define AUTO_QUACK 0
 
 void setup() {
-    Serial.begin(9600);
-    log2("init", "serial started");
+  Serial.begin(9600);
+  log2("init", "serial started");
 
-    while (AUTO_QUACK == 1) {
-        quack();
-        delay(800);
-    }
+  setup_quack();
+  
+  while (AUTO_QUACK == 1) {
+    quack();
+    delay(800);
+  }
 
-    log2("mpu", "setting up..");
-    mpu_setup();
-    mpu_calibrate();
-    log2("mpu", "complete");
+  log2("mpu", "setting up..");
+  mpu_setup();
+  mpu_calibrate();
+  log2("mpu", "complete");
 }
 
 void loop() {
-    mpu_execute();
+  mpu_execute();
 
-    if(mpu_detect(QUACK_THRESHOLD)) {
-        quack();
-        delay(3000);
-        mpu_execute();
-        mpu_execute();
-        mpu_execute();
-    } else {
-        delay(100);
-    }
+  if (mpu_detect(QUACK_THRESHOLD)) {
+    quack();
+    delay(3000);
+    mpu_execute();
+    mpu_execute();
+    mpu_execute();
+  } else {
+    delay(100);
+  }
 }
 
 
 
 /*
- * mpu.c
- */
+   mpu.c
+*/
 
 #include <stdio.h>
 #include <Wire.h>
@@ -108,153 +111,246 @@ void loop() {
 // delay between accel checks
 #define CHECK_ACCEL_DELAY 500
 
-int16_t init_acX,init_acY,init_acZ,init_tmp,init_gyX,init_gyY,init_gyZ;
-int16_t prev_acX,prev_acY,prev_acZ,prev_tmp,prev_gyX,prev_gyY,prev_gyZ;
-int16_t diff_acX,diff_acY,diff_acZ,diff_tmp,diff_gyX,diff_gyY,diff_gyZ;
-int16_t acX,acY,acZ,tmp,gyX,gyY,gyZ;
+int16_t init_acX, init_acY, init_acZ, init_tmp, init_gyX, init_gyY, init_gyZ;
+int16_t prev_acX, prev_acY, prev_acZ, prev_tmp, prev_gyX, prev_gyY, prev_gyZ;
+int16_t diff_acX, diff_acY, diff_acZ, diff_tmp, diff_gyX, diff_gyY, diff_gyZ;
+int16_t acX, acY, acZ, tmp, gyX, gyY, gyZ;
 
 void mpu_setup() {
-    Wire.begin();
-    Wire.beginTransmission(MPU_ADDR);
-    Wire.write(PWR_MGMT);
-    Wire.write(0); // wakes up the MPU-6050
-    Wire.endTransmission(true);
+  Wire.begin();
+  Wire.beginTransmission(MPU_ADDR);
+  Wire.write(PWR_MGMT);
+  Wire.write(0); // wakes up the MPU-6050
+  Wire.endTransmission(true);
 
-    delay(2000);
-    mpu_execute();
+  delay(2000);
+  mpu_execute();
 
-    log2("mpu", "setup complete");
+  log2("mpu", "setup complete");
 }
 
 void mpu_execute() {
-    // save previous values
-    prev_acX = acX;
-    prev_acY = acY;
-    prev_acZ = acZ;
-    prev_tmp = tmp;
-    prev_gyX = gyX;
-    prev_gyY = gyY;
-    prev_gyZ = gyZ;
+  // save previous values
+  prev_acX = acX;
+  prev_acY = acY;
+  prev_acZ = acZ;
+  prev_tmp = tmp;
+  prev_gyX = gyX;
+  prev_gyY = gyY;
+  prev_gyZ = gyZ;
 
-    // capture new values
-    Wire.beginTransmission(MPU_ADDR);
-    Wire.write(ACCEL_XOUT_H);
-    Wire.endTransmission(false);
+  // capture new values
+  Wire.beginTransmission(MPU_ADDR);
+  Wire.write(ACCEL_XOUT_H);
+  Wire.endTransmission(false);
 
-    Wire.requestFrom(MPU_ADDR, NUM_REGISTERS, true);
-    acX = mpu_readint(); // ACCEL_XOUT
-    acY = mpu_readint(); // ACCEL_YOUT
-    acZ = mpu_readint(); // ACCEL_ZOUT
-    tmp = mpu_readint(); // TEMP_OUT
-    gyX = mpu_readint(); // GYRO_XOUT
-    gyY = mpu_readint(); // GYRO_YOUT
-    gyZ = mpu_readint(); // GYRO_ZOUT
+  Wire.requestFrom(MPU_ADDR, NUM_REGISTERS, true);
+  acX = mpu_readint(); // ACCEL_XOUT
+  acY = mpu_readint(); // ACCEL_YOUT
+  acZ = mpu_readint(); // ACCEL_ZOUT
+  tmp = mpu_readint(); // TEMP_OUT
+  gyX = mpu_readint(); // GYRO_XOUT
+  gyY = mpu_readint(); // GYRO_YOUT
+  gyZ = mpu_readint(); // GYRO_ZOUT
 
-    // compute diff
-    diff_acX = acX - prev_acX;
-    diff_acY = acY - prev_acY;
-    diff_acZ = acZ - prev_acZ;
-    diff_tmp = tmp - prev_tmp;
-    diff_gyX = gyX - prev_gyX;
-    diff_gyY = gyY - prev_gyY;
-    diff_gyZ = gyZ - prev_gyZ;
+  // compute diff
+  diff_acX = acX - prev_acX;
+  diff_acY = acY - prev_acY;
+  diff_acZ = acZ - prev_acZ;
+  diff_tmp = tmp - prev_tmp;
+  diff_gyX = gyX - prev_gyX;
+  diff_gyY = gyY - prev_gyY;
+  diff_gyZ = gyZ - prev_gyZ;
 }
 
 int16_t mpu_readint() {
-    return Wire.read() << 8 | Wire.read();
+  return Wire.read() << 8 | Wire.read();
 }
 
 double mpu_temp() {
-    // equation for temperature in C
-    return tmp / 340.00 + 36.53;
+  // equation for temperature in C
+  return tmp / 340.00 + 36.53;
 }
 
 void mpu_print(bool raw) {
-    char buffer[40];
-    Serial.println("acX\tacY\tacZ\tgyX\tgyY\tgyZ\ttmp");
+  char buffer[40];
+  Serial.println("acX\tacY\tacZ\tgyX\tgyY\tgyZ\ttmp");
 
-    if (raw) {
-        sprintf(buffer, "%d\t%d\t%d\t%d\t%d\t%d\t%f", acX, acY, acZ, gyX, gyY, gyZ, mpu_temp());
-    } else {
-        sprintf(buffer, "%d\t%d\t%d\t%d\t%d\t%d\t%f", acX-init_acX, acY-init_acY, acZ-init_acZ, gyX-init_gyX, gyY-init_gyY, gyZ-init_gyZ, mpu_temp);
-    }
+  if (raw) {
+    sprintf(buffer, "%d\t%d\t%d\t%d\t%d\t%d\t%f", acX, acY, acZ, gyX, gyY, gyZ, mpu_temp());
+  } else {
+    sprintf(buffer, "%d\t%d\t%d\t%d\t%d\t%d\t%f", acX - init_acX, acY - init_acY, acZ - init_acZ, gyX - init_gyX, gyY - init_gyY, gyZ - init_gyZ, mpu_temp);
+  }
 
-    Serial.println(buffer);
+  Serial.println(buffer);
 }
 
 void mpu_calibrate() {
-    int total_diff;
-    int consecutive_checks = 0;
-    bool pass = false;
-    char buffer[100];
-    
-    log2("mpu", "starting calibration");
-    
-    do {
-        mpu_execute();
-        
-        total_diff = abs(diff_acX) + abs(diff_acY) + abs(diff_acZ);
-        pass = total_diff < CHECK_ACCEL_MAX;
-        
-        if (pass)
-            consecutive_checks++;
-        else
-            consecutive_checks = 0;
-            
-        sprintf(buffer, "calibration (%d,\t%d,\t%d)\ttotal (%d)\tpass (%d)\tchecks (%d)", diff_acX, diff_acY, diff_acZ, total_diff, pass, consecutive_checks);
-        delay(CHECK_ACCEL_DELAY);
-        log2("mpu", buffer);
-    } while (consecutive_checks < CHECK_ACCEL_COUNT);
+  int total_diff;
+  int consecutive_checks = 0;
+  bool pass = false;
+  char buffer[100];
 
-    // set initial values
-    init_acX = acX;
-    init_acY = acY;
-    init_acZ = acZ;
-    init_gyX = gyX;
-    init_gyY = gyY;
-    init_gyZ = gyZ;
-    init_tmp = tmp;
+  log2("mpu", "starting calibration");
 
-    quack();
-    log2("mpu", "calibrated!");
+  do {
+    mpu_execute();
+
+    total_diff = abs(diff_acX) + abs(diff_acY) + abs(diff_acZ);
+    pass = total_diff < CHECK_ACCEL_MAX;
+
+    if (pass)
+      consecutive_checks++;
+    else
+      consecutive_checks = 0;
+
+    sprintf(buffer, "calibration (%d,\t%d,\t%d)\ttotal (%d)\tpass (%d)\tchecks (%d)", diff_acX, diff_acY, diff_acZ, total_diff, pass, consecutive_checks);
+    delay(CHECK_ACCEL_DELAY);
+    log2("mpu", buffer);
+  } while (consecutive_checks < CHECK_ACCEL_COUNT);
+
+  // set initial values
+  init_acX = acX;
+  init_acY = acY;
+  init_acZ = acZ;
+  init_gyX = gyX;
+  init_gyY = gyY;
+  init_gyZ = gyZ;
+  init_tmp = tmp;
+
+  quack();
+  log2("mpu", "calibrated!");
 }
 
 bool mpu_detect(unsigned int quack_threshold) {
-    int total_diff;
-    char buffer[50];
-    
-    total_diff = abs(diff_acX) + abs(diff_acY) + abs(diff_acZ);
+  int total_diff;
+  char buffer[50];
 
-    if (total_diff >= CHECK_ACCEL_MAX) {
-        sprintf(buffer, "total_diff %d", total_diff);
-        log2("mpu", buffer);
-    }
+  total_diff = abs(diff_acX) + abs(diff_acY) + abs(diff_acZ);
 
-    return total_diff >= quack_threshold;
+  if (total_diff >= CHECK_ACCEL_MAX) {
+    sprintf(buffer, "total_diff %d", total_diff);
+    log2("mpu", buffer);
+  }
+
+  return total_diff >= quack_threshold;
 }
 
 /*
- * quack.c
- */
+   quack.c
+*/
 
-#include <PCM.h>
+// https://www.arduino.cc/en/Tutorial/SimpleAudioPlayer
+#include <SPI.h>
+#include <SD.h>
+#include <Audio.h>
 
+#define SAMPLE_BLOCK_SIZE 1024
 
-const unsigned char sample[] PROGMEM = {
-    123, 124, 125, 125, 123, 122, 123, 125, 125, 127, 127, 128, 131, 132, 134, 135, 137, 139, 140, 138, 131, 121, 112, 107, 107, 111, 115, 118, 118, 117, 110, 101, 97, 96, 98, 108, 116, 124, 129, 133, 131, 128, 124, 122, 121, 124, 132, 139, 146, 148, 147, 143, 135, 129, 127, 129, 134, 141, 152, 161, 168, 171, 167, 154, 123, 94, 85, 94, 118, 143, 159, 168, 159, 134, 100, 80, 80, 97, 119, 136, 148, 151, 141, 122, 106, 97, 100, 111, 119, 122, 119, 109, 101, 95, 99, 107, 111, 110, 106, 104, 101, 103, 107, 114, 125, 134, 144, 151, 151, 148, 142, 142, 152, 168, 191, 210, 223, 213, 159, 88, 50, 67, 126, 179, 196, 186, 154, 103, 47, 32, 55, 111, 165, 177, 165, 144, 125, 114, 117, 131, 155, 166, 153, 131, 112, 114, 127, 137, 139, 129, 104, 70, 49, 46, 69, 99, 113, 113, 94, 77, 76, 87, 108, 130, 141, 146, 143, 138, 143, 155, 173, 201, 227, 244, 236, 161, 60, 24, 70, 161, 223, 204, 153, 104, 64, 48, 59, 102, 151, 157, 122, 100, 112, 146, 177, 179, 162, 135, 114, 108, 128, 162, 185, 173, 132, 98, 82, 76, 79, 85, 83, 79, 69, 68, 76, 85, 89, 89, 91, 94, 101, 111, 133, 158, 173, 178, 184, 194, 217, 248, 206, 109, 42, 62, 147, 209, 199, 140, 106, 83, 62, 69, 94, 110, 101, 82, 97, 150, 179, 173, 147, 113, 106, 127, 152, 178, 180, 157, 140, 137, 141, 131, 106, 84, 72, 74, 77, 86, 89, 86, 80, 77, 83, 92, 100, 118, 127, 127, 138, 157, 194, 221, 242, 241, 200, 69, 21, 122, 220, 243, 160, 94, 100, 131, 129, 112, 74, 38, 52, 99, 164, 189, 138, 100, 111, 140, 158, 153, 138, 127, 133, 156, 186, 175, 123, 87, 95, 116, 109, 83, 70, 78, 89, 99, 92, 73, 78, 108, 130, 133, 125, 135, 172, 211, 237, 242, 175, 47, 43, 176, 255, 200, 89, 87, 162, 169, 138, 90, 24, 29, 82, 147, 175, 117, 72, 114, 165, 158, 121, 101, 117, 145, 166, 177, 156, 97, 90, 138, 158, 122, 75, 69, 96, 114, 97, 86, 80, 80, 109, 129, 131, 127, 143, 197, 235, 234, 210, 131, 37, 106, 227, 238, 150, 63, 126, 212, 166, 80, 44, 36, 94, 148, 145, 107, 71, 120, 173, 151, 106, 108, 141, 160, 152, 140, 144, 130, 135, 149, 129, 90, 77, 104, 119, 108, 90, 90, 98, 111, 123, 123, 114, 134, 186, 210, 234, 221, 111, 44, 146, 236, 202, 115, 94, 181, 199, 118, 67, 59, 95, 141, 122, 85, 62, 96, 177, 158, 80, 82, 137, 165, 147, 112, 115, 134, 149, 168, 134, 81, 85, 131, 135, 84, 64, 86, 117, 122, 105, 110, 125, 146, 182, 220, 214, 154, 42, 72, 226, 207, 113, 73, 131, 232, 173, 63, 69, 79, 113, 147, 96, 56, 76, 155, 176, 92, 39, 105, 159, 139, 114, 104, 120, 133, 142, 142, 118, 101, 106, 120, 106, 89, 98, 107, 111, 115, 125, 144, 152, 173, 208, 212, 135, 30, 125, 239, 177, 89, 93, 168, 210, 159, 71, 72, 102, 144, 148, 94, 75, 124, 179, 132, 63, 77, 144, 153, 108, 103, 128, 150, 136, 125, 121, 112, 119, 123, 113, 91, 109, 124, 100, 93, 119, 134, 147, 163, 190, 211, 162, 46, 79, 217, 205, 107, 79, 169, 220, 156, 76, 73, 94, 131, 139, 76, 71, 125, 184, 150, 60, 73, 149, 158, 106, 77, 107, 150, 151, 127, 116, 117, 122, 119, 106, 91, 94, 123, 116, 101, 112, 130, 149, 169, 172, 187, 133, 22, 117, 232, 159, 67, 92, 175, 197, 125, 64, 90, 115, 141, 114, 61, 101, 164, 169, 119, 75, 105, 166, 136, 94, 97, 127, 163, 148, 128, 124, 125, 122, 122, 124, 105, 96, 123, 138, 136, 141, 139, 154, 184, 187, 181, 88, 68, 197, 201, 109, 91, 127, 181, 178, 87, 78, 113, 134, 141, 86, 74, 149, 172, 116, 85, 94, 138, 140, 96, 93, 119, 140, 139, 125, 117, 118, 130, 121, 113, 112, 108, 122, 131, 135, 147, 157, 172, 183, 181, 149, 71, 118, 213, 152, 90, 115, 159, 165, 130, 91, 101, 113, 126, 122, 85, 96, 148, 160, 102, 79, 113, 148, 119, 84, 105, 126, 126, 116, 120, 117, 114, 112, 109, 114, 103, 101, 113, 115, 130, 141, 147, 168, 177, 189, 140, 47, 153, 222, 120, 96, 128, 161, 172, 122, 86, 112, 112, 132, 118, 86, 117, 158, 144, 91, 95, 130, 158, 109, 78, 127, 142, 125, 120, 128, 129, 132, 118, 106, 112, 113, 119, 126, 121, 129, 141, 161, 178, 181, 144, 64, 138, 223, 148, 90, 131, 168, 163, 141, 104, 115, 123, 122, 112, 102, 118, 148, 148, 109, 106, 123, 140, 119, 92, 124, 141, 122, 120, 144, 138, 125, 115, 102, 118, 128, 115, 107, 122, 142, 145, 149, 158, 172, 156, 59, 100, 212, 158, 87, 132, 163, 159, 142, 104, 121, 133, 125, 111, 108, 124, 145, 153, 117, 115, 133, 135, 124, 95, 112, 131, 127, 124, 135, 142, 127, 116, 113, 124, 127, 112, 111, 132, 144, 142, 138, 153, 181, 163, 64, 90, 206, 164, 94, 128, 163, 155, 144, 110, 115, 133, 127, 113, 109, 129, 139, 148, 128, 119, 130, 133, 130, 110, 114, 130, 134, 129, 130, 134, 128, 117, 110, 127, 127, 114, 115, 131, 153, 147, 127, 153, 195, 140, 46, 126, 214, 136, 90, 138, 170, 157, 129, 104, 122, 134, 129, 103, 106, 139, 141, 138, 114, 115, 134, 135, 114, 101, 120, 134, 121, 114, 127, 126, 124, 126, 112, 107, 120, 123, 106, 110, 136, 134, 123, 140, 149, 162, 139, 71, 136, 179, 105, 106, 150, 143, 153, 138, 105, 127, 122, 120, 113, 108, 129, 141, 128, 115, 123, 126, 132, 116, 102, 121, 125, 120, 115, 122, 132, 120, 103, 109, 128, 116, 101, 117, 129, 133, 120, 128, 162, 174, 114, 56, 151, 182, 84, 69, 139, 155, 129, 112, 108, 123, 120, 111, 99, 115, 126, 129, 136, 116, 121, 132, 131, 118, 111, 129, 135, 123, 122, 132, 131, 129, 115, 117, 130, 109, 102, 125, 121, 113, 120, 130, 138, 126, 140, 171, 144, 71, 110, 180, 132, 88, 119, 167, 157, 126, 108, 120, 127, 129, 118, 103, 137, 137, 130, 118, 116, 132, 133, 122, 106, 128, 136, 127, 121, 125, 142, 136, 117, 120, 124, 108, 117, 131, 100, 111, 143, 124, 119, 127, 132, 148, 150, 153, 134, 90, 156, 177, 98, 113, 168, 156, 133, 121, 122, 138, 122, 123, 118, 117, 131, 130, 121, 117, 128, 127, 128, 118, 120, 137, 133, 125, 127, 138, 132, 124, 116, 119, 133, 122, 102, 103, 123, 130, 108, 102, 124, 133, 126, 118, 118, 140, 160, 150, 139, 101, 137, 188, 126, 107, 154, 161, 137, 127, 120, 135, 131, 121, 113, 106, 131, 131, 121, 127, 129, 126, 130, 129, 120, 127, 134, 132, 134, 135, 132, 126, 128, 127, 121, 116, 117, 118, 107, 116, 126, 112, 114, 117, 117, 129, 119, 112, 134, 136, 132, 138, 146, 150, 107, 132, 180, 127, 102, 140, 151, 132, 124, 120, 126, 123, 114, 111, 110, 127, 125, 121, 122, 128, 133, 124, 122, 123, 129, 130, 129, 127, 134, 139, 125, 120, 128, 130, 117, 110, 121, 126, 118, 108, 115, 129, 114, 103, 119, 121, 120, 124, 118, 124, 130, 121, 123, 136, 137, 138, 146, 138, 108, 128, 151, 110, 102, 133, 139, 121, 122, 120, 123, 118, 119, 114, 114, 129, 126, 128, 128, 131, 130, 130, 127, 121, 129, 133, 128, 130, 136, 135, 130, 130, 130, 129, 123, 122, 127, 119, 114, 118, 127, 125, 115, 112, 124, 122, 116, 118, 116, 124, 126, 123, 124, 128, 127, 127, 127, 127, 128, 128, 128, 127, 127, 128, 128, 127, 127, 127, 128, 128, 128, 127, 127, 128, 127, 127, 128, 127, 127, 128, 128, 127, 127, 128, 127, 127, 128, 128, 127, 127, 128, 128, 128, 128, 127, 128, 128, 128, 127, 127, 128, 127, 127, 128, 128, 127, 128, 128, 127, 128, 128, 127, 128, 128, 128, 127, 127, 127, 127, 127, 127, 127, 127, 127, 128, 128, 127, 127, 128, 128, 127, 127, 128, 128, 128, 127, 128, 128, 128, 128, 128, 128, 128, 128, 127, 128, 128, 128, 128, 127, 127, 127, 128, 127, 127, 127, 127, 127, 128, 128, 127, 128, 127, 128, 127, 127, 127, 128, 128, 128, 128, 128, 128, 128, 128, 128, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 128, 127, 128, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 128, 128, 128, 127, 128, 128, 127, 127, 128, 127, 127, 127, 127, 127, 127, 127, 127, 128, 128, 128, 128, 128, 128, 128, 127, 128, 127, 127, 128, 127, 128, 128, 128, 127, 128, 127, 127, 127, 127, 128, 127, 127, 127, 128, 127, 127, 128, 128, 127, 127, 128, 127, 127, 127, 127, 127, 127, 128, 127, 127, 127, 128, 127, 127, 127, 128, 128, 128, 128, 128, 127, 128, 127, 127, 127, 127, 127, 127, 128, 127, 127, 127, 127, 127, 127, 128, 127, 128, 127, 128, 127, 128, 128, 127, 128, 127, 128, 127, 128, 127, 128, 127, 127, 127, 127, 128, 127, 127, 127, 128, 127, 127, 127, 127, 127, 127, 128, 127, 128, 127, 127, 128, 127, 128, 128, 128, 128, 127, 128, 127, 128, 127, 128, 128, 128, 128, 128, 127, 128, 128, 127, 128, 127, 128, 127, 128, 127, 128, 127, 128, 128, 127, 128, 127, 128, 128, 127, 128, 127, 128, 127, 128, 127, 128, 128, 127, 128, 128, 127, 128, 127, 128, 128, 127, 128, 127, 128, 127, 128, 127, 128, 127, 128, 127, 128, 127, 128, 127, 128, 127, 128, 128, 127, 128, 127, 128, 127, 127, 128, 127, 128, 128, 127, 128, 127, 128, 128, 128, 127, 128, 127, 128, 127, 128, 127, 127, 128, 127, 128, 127, 128, 128, 128, 127, 128, 127, 128, 127, 128, 127, 128, 127, 128, 127, 128, 128, 128, 127, 128, 127, 128, 127, 128, 128, 127, 128, 128, 127, 128, 128, 127, 128, 128, 127, 128, 127, 128, 127, 128, 127, 128, 127, 128, 128, 127, 128, 128, 127, 128, 127, 128, 128, 127, 128, 127, 128, 127, 128, 127, 128, 127, 128, 127, 128, 127, 128, 128, 127, 128, 128, 127, 128, 127, 128, 128, 127, 128, 127, 128, 127, 128, 127, 128, 127, 128, 127, 128, 127, 128, 127, 128, 127, 128, 127, 128, 127, 128, 128, 127, 128, 127, 128, 127, 128, 127, 128, 127, 128, 128, 127, 128, 127, 128, 128, 127, 128, 127, 128, 127, 128, 127, 128, 127, 128, 127, 128, 127, 128, 128, 128, 128, 128, 127, 128, 127, 128, 127, 128, 127, 128, 127, 128, 128, 127, 128, 127, 128, 128, 127, 128, 127, 128, 127, 128, 128, 127, 128, 128, 128, 127, 128, 127, 128, 127, 128, 127, 128, 128, 128, 128, 128, 127, 128, 128, 128, 128, 127, 128, 128, 127, 128, 127, 128, 127, 127, 128, 127, 128, 128, 127, 128, 127, 128, 127, 128, 127, 128, 127, 128, 127, 128, 128, 127, 128, 127, 127, 128, 127, 128, 127, 128, 127, 128, 127, 128, 127, 128, 127, 128, 128, 128, 128, 127, 128, 127, 128, 127, 128, 127, 128, 127, 128, 127, 128, 128, 127, 128, 127, 128, 128, 127, 128, 127, 128, 127, 128, 127, 128, 127, 128, 127, 128, 127, 128, 127, 128, 128, 127, 128, 127, 128, 127, 128, 127, 128, 127, 128, 128, 128, 127, 128, 127, 128, 127, 128, 127, 128, 127, 128, 127, 128, 127, 128, 127, 128, 128, 128, 128, 128, 128, 127, 128, 127, 128, 127, 128, 127, 128, 127, 127, 128, 127, 128, 128, 127, 128, 127, 128, 127, 128, 127, 128, 127, 128, 128, 128, 127, 128, 127, 128, 128, 128, 127, 128, 127, 128, 128, 127, 128, 127, 128, 127, 128, 127, 128, 127, 128, 127, 128, 127, 128, 128, 127, 128, 127, 128, 128, 127, 128, 127, 128, 127, 128, 127, 128, 128, 128, 127,
-};
+void setup_quack() {
+  Sd2Card card;
+  SdVolume volume;
+  SdFile root;
+
+  if (!card.init(SPI_HALF_SPEED, 52)) {
+    log2("SD", "card init failed!");
+  } else {
+    log2("SD", "card initialized!");
+    switch (card.type()) {
+      case SD_CARD_TYPE_SD1:
+        log2("SD", "SD1");
+        break;
+      case SD_CARD_TYPE_SD2:
+        log2("SD", "SD2");
+        break;
+      case SD_CARD_TYPE_SDHC:
+        log2("SD", "SDHC");
+        break;
+      default:
+        log2("SD", "Unknown");
+    }
+  }
+
+  if (!!volume.init(card)) {
+    log2("SD", "volume init failed!");
+  } else {
+    log2("SD", "volume initialized!");
+    Serial.print("Clusters:          ");
+    Serial.println(volume.clusterCount());
+    Serial.print("Blocks x Cluster:  ");
+    Serial.println(volume.blocksPerCluster());
+
+    Serial.print("Total Blocks:      ");
+    Serial.println(volume.blocksPerCluster() * volume.clusterCount());
+    Serial.println();
+
+    // print the type and size of the first FAT-type volume
+    uint32_t volumesize;
+    Serial.print("Volume type is:    FAT");
+    Serial.println(volume.fatType(), DEC);
+
+    volumesize = volume.blocksPerCluster();    // clusters are collections of blocks
+    volumesize *= volume.clusterCount();       // we'll have a lot of clusters
+    volumesize /= 2;                           // SD card blocks are always 512 bytes (2 blocks are 1KB)
+    Serial.print("Volume size (Kb):  ");
+    Serial.println(volumesize);
+    Serial.print("Volume size (Mb):  ");
+    volumesize /= 1024;
+  Serial.println(volumesize);
+  Serial.print("Volume size (Gb):  ");
+  Serial.println((float)volumesize / 1024.0);
+
+    root.openRoot(volume);
+    root.ls(LS_R | LS_DATE | LS_SIZE);
+  }
+
+  if (!SD.begin(52)) {
+    log2("SD", "failed!");
+  } else {
+    log2("SD", "set up!");
+  }
+
+  Audio.begin(88200, 100);
+}
 
 void quack() {
   log("quack!");
-  startPlayback(sample, sizeof(sample));
-  delay(1000);
+
+  int count = 0;
+  File myFile = SD.open("hayes.wav");
+  if (!myFile) {
+    log2("SD", "error opening hayes.wav");
+    while (true);
+  }
+
+  short buffer[SAMPLE_BLOCK_SIZE];
+
+  // until the file is not finished
+  while (myFile.available()) {
+    // read from the file into buffer
+    myFile.read(buffer, sizeof(buffer));
+
+    // Prepare samples
+    int volume = 1024;
+    Audio.prepare(buffer, SAMPLE_BLOCK_SIZE, volume);
+    // Feed samples to audio
+    Audio.write(buffer, SAMPLE_BLOCK_SIZE);
+
+    // Every 100 block print a '.'
+    count++;
+    if (count == 100) {
+      Serial.print(".");
+      count = 0;
+    }
+  }
+  myFile.close();
 }
 
 
 
 /*
- * logger.c
- */
+   logger.c
+*/
 
 #include <stdio.h>
 
@@ -262,15 +358,15 @@ void quack() {
 #define MAX_LENGTH 200
 
 void log(const char *message) {
-    Serial.println(message);
+  Serial.println(message);
 }
 
 void log2(const char *category, const char* message) {
-    char buffer[MAX_LENGTH];
+  char buffer[MAX_LENGTH];
 
-    if (LOG == 1) {
-        sprintf(buffer, "%s: %s", category, message);
-    }
+  if (LOG == 1) {
+    sprintf(buffer, "%s: %s", category, message);
+  }
 
-    Serial.println(buffer);
+  Serial.println(buffer);
 }
