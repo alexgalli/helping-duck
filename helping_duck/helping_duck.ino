@@ -50,7 +50,7 @@ void quack();
 #include <Arduino.h>
 
 // threshold to trigger a desk bump
-#define QUACK_THRESHOLD 6000
+#define QUACK_THRESHOLD 10000
 
 // for testing set to 1
 #define AUTO_QUACK 0
@@ -60,7 +60,7 @@ void setup() {
   log2("init", "serial started");
 
   setup_quack();
-  
+
   while (AUTO_QUACK == 1) {
     quack();
     delay(800);
@@ -77,7 +77,7 @@ void loop() {
 
   if (mpu_detect(QUACK_THRESHOLD)) {
     quack();
-    delay(3000);
+    delay(100);
     mpu_execute();
     mpu_execute();
     mpu_execute();
@@ -85,6 +85,7 @@ void loop() {
     delay(100);
   }
 }
+
 
 
 
@@ -248,76 +249,25 @@ bool mpu_detect(unsigned int quack_threshold) {
 #define SAMPLE_BLOCK_SIZE 1024
 
 void setup_quack() {
-  Sd2Card card;
-  SdVolume volume;
   SdFile root;
-
-  if (!card.init(SPI_HALF_SPEED, 52)) {
-    log2("SD", "card init failed!");
-  } else {
-    log2("SD", "card initialized!");
-    switch (card.type()) {
-      case SD_CARD_TYPE_SD1:
-        log2("SD", "SD1");
-        break;
-      case SD_CARD_TYPE_SD2:
-        log2("SD", "SD2");
-        break;
-      case SD_CARD_TYPE_SDHC:
-        log2("SD", "SDHC");
-        break;
-      default:
-        log2("SD", "Unknown");
-    }
-  }
-
-  if (!!volume.init(card)) {
-    log2("SD", "volume init failed!");
-  } else {
-    log2("SD", "volume initialized!");
-    Serial.print("Clusters:          ");
-    Serial.println(volume.clusterCount());
-    Serial.print("Blocks x Cluster:  ");
-    Serial.println(volume.blocksPerCluster());
-
-    Serial.print("Total Blocks:      ");
-    Serial.println(volume.blocksPerCluster() * volume.clusterCount());
-    Serial.println();
-
-    // print the type and size of the first FAT-type volume
-    uint32_t volumesize;
-    Serial.print("Volume type is:    FAT");
-    Serial.println(volume.fatType(), DEC);
-
-    volumesize = volume.blocksPerCluster();    // clusters are collections of blocks
-    volumesize *= volume.clusterCount();       // we'll have a lot of clusters
-    volumesize /= 2;                           // SD card blocks are always 512 bytes (2 blocks are 1KB)
-    Serial.print("Volume size (Kb):  ");
-    Serial.println(volumesize);
-    Serial.print("Volume size (Mb):  ");
-    volumesize /= 1024;
-  Serial.println(volumesize);
-  Serial.print("Volume size (Gb):  ");
-  Serial.println((float)volumesize / 1024.0);
-
-    root.openRoot(volume);
-    root.ls(LS_R | LS_DATE | LS_SIZE);
-  }
+  SdVolume volume;
 
   if (!SD.begin(52)) {
     log2("SD", "failed!");
   } else {
     log2("SD", "set up!");
+    // dunno why this is needed, but it's magic
+    root.openRoot(volume);
   }
 
-  Audio.begin(88200, 100);
+  Audio.begin(44100, 100);
 }
 
 void quack() {
   log("quack!");
 
   int count = 0;
-  File myFile = SD.open("hayes.wav");
+  File myFile = SD.open("HAYES.WAV");
   if (!myFile) {
     log2("SD", "error opening hayes.wav");
     while (true);
@@ -331,19 +281,14 @@ void quack() {
     myFile.read(buffer, sizeof(buffer));
 
     // Prepare samples
-    int volume = 1024;
+    int volume = 2048;
     Audio.prepare(buffer, SAMPLE_BLOCK_SIZE, volume);
     // Feed samples to audio
     Audio.write(buffer, SAMPLE_BLOCK_SIZE);
-
-    // Every 100 block print a '.'
-    count++;
-    if (count == 100) {
-      Serial.print(".");
-      count = 0;
-    }
   }
   myFile.close();
+  // fix stuttering by hacking Audio.cpp: https://forum.arduino.cc/index.php?topic=284345.0
+  Audio.rst();
 }
 
 
