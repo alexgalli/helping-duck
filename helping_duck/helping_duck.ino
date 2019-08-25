@@ -1,3 +1,8 @@
+#define QUACK_THRESHOLD_TOP 10000
+#define NON_QUACK_CHANGE_TOP 40
+#define AUTO_QUACK_TOP 0
+#define VOLUME_TOP 1024
+
 /*
    mpu.h
 */
@@ -50,10 +55,10 @@ void quack();
 #include <Arduino.h>
 
 // threshold to trigger a desk bump
-#define QUACK_THRESHOLD 10000
+#define QUACK_THRESHOLD QUACK_THRESHOLD_TOP
 
 // for testing set to 1
-#define AUTO_QUACK 0
+#define AUTO_QUACK AUTO_QUACK_TOP
 
 void setup() {
   Serial.begin(9600);
@@ -62,7 +67,7 @@ void setup() {
   setup_quack();
 
   while (AUTO_QUACK == 1) {
-    quack();
+    quack(false);
     delay(800);
   }
 
@@ -76,7 +81,7 @@ void loop() {
   mpu_execute();
 
   if (mpu_detect(QUACK_THRESHOLD)) {
-    quack();
+    quack(false);
     delay(100);
     mpu_execute();
     mpu_execute();
@@ -219,7 +224,7 @@ void mpu_calibrate() {
   init_gyZ = gyZ;
   init_tmp = tmp;
 
-  quack();
+  quack(true);
   log2("mpu", "calibrated!");
 }
 
@@ -244,9 +249,13 @@ bool mpu_detect(unsigned int quack_threshold) {
 // https://www.arduino.cc/en/Tutorial/SimpleAudioPlayer
 #include <SPI.h>
 #include <SD.h>
-#include <Audio.h>
+#include "Audio.h"
 
 #define SAMPLE_BLOCK_SIZE 1024
+#define NON_QUACK_CHANCE NON_QUACK_CHANGE_TOP
+#define VOLUME VOLUME_TOP
+
+int quack_file_count, other_file_count;
 
 void setup_quack() {
   SdFile root;
@@ -260,33 +269,92 @@ void setup_quack() {
     root.openRoot(volume);
   }
 
+  // count files
+  File dir, entry;
+  char logbuffer[20];
+  dir = SD.open("quack");
+  while (true) {
+    entry = dir.openNextFile();
+    if (! entry) break;
+    quack_file_count++;
+    entry.close();
+  }
+  dir.close();
+  sprintf(logbuffer, "counted %d quack files", quack_file_count);
+  log2("SD", logbuffer);
+  
+  dir = SD.open("other");
+  while (true) {
+    entry = dir.openNextFile();
+    if (! entry) break;
+    other_file_count++;
+    entry.close();
+  }
+  dir.close();
+  sprintf(logbuffer, "counted %d quack files", other_file_count);
+  log2("SD", logbuffer);
+
   Audio.begin(44100, 100);
 }
 
-void quack() {
+void quack(bool always_quack) {
   log("quack!");
 
-  int count = 0;
-  File myFile = SD.open("HAYES.WAV");
-  if (!myFile) {
-    log2("SD", "error opening hayes.wav");
+  // first, select a sound type
+  int file_index;
+  File dir;
+  char logbuffer[20];
+  bool is_quack = always_quack || random(0, 100) > NON_QUACK_CHANCE;
+  if (is_quack) {
+    dir = SD.open("quack");
+    if (always_quack) {
+      file_index = 0;
+    } else {
+      file_index = random(0, quack_file_count);
+    }
+    sprintf(logbuffer, "selected quack %d", file_index);
+    log2("quack", logbuffer);
+  } else {
+    dir = SD.open("other");
+    file_index = random(0, other_file_count);
+    sprintf(logbuffer, "selected non-quack %d", file_index);
+    log2("quack", logbuffer);
+  }
+
+  // open our file
+  File audioFile;
+  int i = 0;
+  while (true) {
+    audioFile = dir.openNextFile();
+    if (i == file_index) {
+      break;
+    }
+    audioFile.close();
+    i++;
+  }
+  dir.close();
+
+  // play file
+  if (!audioFile) {
+    log2("quack", "error opening file");
     while (true);
+  } else {
+    log2("quack", audioFile.name());
   }
 
   short buffer[SAMPLE_BLOCK_SIZE];
 
   // until the file is not finished
-  while (myFile.available()) {
+  while (audioFile.available()) {
     // read from the file into buffer
-    myFile.read(buffer, sizeof(buffer));
+    audioFile.read(buffer, sizeof(buffer));
 
     // Prepare samples
-    int volume = 2048;
-    Audio.prepare(buffer, SAMPLE_BLOCK_SIZE, volume);
+    Audio.prepare(buffer, SAMPLE_BLOCK_SIZE, VOLUME);
     // Feed samples to audio
     Audio.write(buffer, SAMPLE_BLOCK_SIZE);
   }
-  myFile.close();
+  audioFile.close();
   // fix stuttering by hacking Audio.cpp: https://forum.arduino.cc/index.php?topic=284345.0
   Audio.rst();
 }
